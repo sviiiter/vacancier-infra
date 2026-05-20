@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: vacancier
+      POSTGRES_USER: vacancier
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+
+  vacancier-parser:
+    build: ../vacancier-parser
+    env_file: ../vacancier-parser/.env
+    environment:
+      DATABASE_URL: postgresql://vacancier:${DB_PASSWORD}@postgres:5432/vacancier
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  vacancier-tg-bot:
+    build: ../vacancier-tg-bot
+    env_file:
+      - path: ../vacancier-tg-bot/.env
+        required: false
+    environment:
+      DB_DRIVER: postgres
+      DB_DSN: postgresql://vacancier:${DB_PASSWORD}@postgres:5432/vacancier
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  vacancier-ui:
+    build: ../vacancier-ui
+    environment:
+      DATABASE_URL: postgresql://vacancier:${DB_PASSWORD}@postgres:5432/vacancier
+    depends_on:
+      - postgres
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
