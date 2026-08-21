@@ -10,14 +10,54 @@ services:
     restart: unless-stopped
     ports:
       - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vacancier"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: vacancier
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   vacancier-parser:
-    build: ../vacancier-parser
-    env_file: ../vacancier-parser/.env
+    build: ../vacancier-parser-v2
+    env_file: ../vacancier-parser-v2/.env
     environment:
       DATABASE_URL: postgresql://vacancier:${DB_PASSWORD}@postgres:5432/vacancier
+      RABBITMQ_URL: amqp://vacancier:${RABBITMQ_PASSWORD}@rabbitmq:5672/
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  vacancier-worker:
+    build: ../vacancier-parser-v2
+    env_file: ../vacancier-parser-v2/.env
+    entrypoint: ["python"]
+    command: ["worker.py"]
+    environment:
+      DATABASE_URL: postgresql://vacancier:${DB_PASSWORD}@postgres:5432/vacancier
+      RABBITMQ_URL: amqp://vacancier:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     restart: unless-stopped
 
   vacancier-tg-bot:
@@ -29,7 +69,8 @@ services:
       DB_DRIVER: postgres
       DB_DSN: postgresql://vacancier:${DB_PASSWORD}@postgres:5432/vacancier
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   vacancier-ui:
@@ -37,10 +78,12 @@ services:
     environment:
       DATABASE_URL: postgresql://vacancier:${DB_PASSWORD}@postgres:5432/vacancier
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "8080:80"
     restart: unless-stopped
 
 volumes:
   postgres_data:
+  rabbitmq_data:
