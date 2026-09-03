@@ -1,0 +1,7 @@
+cd ..
+VCR=$(pwd)
+alias cd_ifr="cd $VCR/vacancier-infra"
+alias cd_bot="cd $VCR/vacancier-tg-bot"
+alias cd_p="cd $VCR/vacancier-parser-v2"
+alias cd_ui="cd $VCR/vacancier-ui"
+alias rst_p="dkc down && sleep 3 && dkc build --no-cache vacancier-worker vacancier-parser && sleep 3 && dkc run --rm --entrypoint python vacancier-parser parser.py"
